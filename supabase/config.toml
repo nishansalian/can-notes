@@ -1,0 +1,8 @@
+[functions.teacher-login]
+verify_jwt = false
+
+[functions.student-access]
+verify_jwt = false
+
+[functions.classroom-admin]
+verify_jwt = true

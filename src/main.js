@@ -17,6 +17,11 @@ const icons = {
   lock: '<svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
 }
 let state = { session: null, profile: null, classrooms: [], classroom: null, subjects: [], folders: [], materials: [], activeSubject: null, folder: null, studentMode: false, studentToken: null, query: '', authFlow: null }
+let deferredInstallPrompt = null
+const studentInstallTokenKey = 'can-notes:student-install-token'
+
+window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); deferredInstallPrompt = event })
+window.addEventListener('appinstalled', () => { deferredInstallPrompt = null; toast('Can Notes was added to your device.') })
 
 function esc(value = '') { return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]) }
 function initials(name = 'Teacher') { return name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'TP' }
@@ -49,6 +54,11 @@ async function resetPassword() {
 }
 async function start() {
   if (!configured) return setupScreen()
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(error => console.warn('Can Notes app install support is unavailable.', error))
+  if (new URLSearchParams(location.search).get('launch') === 'student') {
+    const savedStudentToken = localStorage.getItem(studentInstallTokenKey)
+    if (savedStudentToken) { state.studentMode = true; state.studentToken = savedStudentToken; await renderStudent(); return }
+  }
   if (location.pathname === '/class' && location.hash) {
     state.studentMode = true; state.studentToken = location.hash.slice(1); await renderStudent(); return
   }
@@ -257,7 +267,9 @@ function manageClassroomAccess() {
   const choices = [
     ['invite', 'Invite a teacher', 'Invite a colleague to this classroom'],
     ['code', 'Create teacher join code', 'Let another teacher join this classroom'],
-    ['student-link', 'Create or rotate student link', 'Share read-only materials access with students'],
+    ['student-link', 'Get classroom student link', 'Copy the same link for this classroom'],
+    ['rotate-student-link', 'Rotate student link', 'Invalidate the old link and create a new one'],
+    ['revoke-student-link', 'Revoke student link', 'Stop access through the current student link'],
     ['edit', 'Edit classroom details', 'Change the name, year, branch or section'],
     ['teachers', 'Manage teachers', 'Review or remove classroom members'],
     ['delete', 'Delete classroom', 'Remove this classroom and uploaded files'],
@@ -269,13 +281,35 @@ function manageClassroomAccess() {
     if (choice === 'edit') return openEditClassroomDialog()
     if (choice === 'teachers') return openTeacherManager()
     if (choice === 'code') { try { const result = await adminRequest({ action: 'issue_teacher_code', classroom_id: state.classroom.id }); return showActionResult('Teacher join code created', 'This code is single-use and expires in 14 days.', result.code, 'Join code') } catch (error) { return toast(error.message, true) } }
-    if (choice === 'student-link') return openStudentLinkConfirmation()
+    if (choice === 'student-link') return getStudentLink()
+    if (choice === 'rotate-student-link') return openStudentLinkConfirmation('rotate')
+    if (choice === 'revoke-student-link') return openStudentLinkConfirmation('revoke')
     if (choice === 'delete') return openDeleteClassroomConfirmation()
   }))
 }
-function openStudentLinkConfirmation() {
-  const dialog = showDialog('Rotate student link?', 'The current student link will stop working. Anyone with the new link can browse and download materials in this classroom.', '<div class="subject-dialog-actions"><button class="button button-secondary" type="button" data-close-dialog>Cancel</button><button class="button button-primary" type="button" data-confirm-rotate>Rotate link</button></div>')
-  dialog.querySelector('[data-confirm-rotate]').addEventListener('click', async event => { const button = event.currentTarget; button.disabled = true; button.textContent = 'Creating…'; try { const result = await adminRequest({ action: 'rotate_student_link', classroom_id: state.classroom.id }); dialog.remove(); showActionResult('Student link ready', 'Share this link only with the classroom. Forwarded links grant access.', result.link, 'Student link') } catch (error) { button.disabled = false; button.textContent = 'Rotate link'; toast(error.message, true) } })
+async function getStudentLink() {
+  try {
+    const result = await adminRequest({ action: 'get_student_link', classroom_id: state.classroom.id })
+    showActionResult('Classroom student link', result.replacedPrevious ? 'This classroom had an older, one-time link. Share this permanent classroom link going forward.' : 'This same link remains active until you rotate or revoke it. Forwarded links grant access.', result.link, 'Student link')
+  } catch (error) { toast(error.message, true) }
+}
+function openStudentLinkConfirmation(action) {
+  const isRotate = action === 'rotate'
+  const title = isRotate ? 'Rotate student link?' : 'Revoke student link?'
+  const description = isRotate
+    ? 'The link currently shared with students will stop working. You will get a new link for this classroom.'
+    : 'Students will lose access through the current link. You can create a new classroom link later.'
+  const buttonText = isRotate ? 'Rotate link' : 'Revoke link'
+  const dialog = showDialog(title, description, `<div class="subject-dialog-actions"><button class="button button-secondary" type="button" data-close-dialog>Cancel</button><button class="button ${isRotate ? 'button-primary' : 'button-danger'}" type="button" data-confirm-link>${buttonText}</button></div>`)
+  dialog.querySelector('[data-confirm-link]').addEventListener('click', async event => {
+    const button = event.currentTarget; button.disabled = true; button.textContent = isRotate ? 'Rotating…' : 'Revoking…'
+    try {
+      const result = await adminRequest({ action: isRotate ? 'rotate_student_link' : 'revoke_student_link', classroom_id: state.classroom.id })
+      dialog.remove()
+      if (isRotate) showActionResult('New student link ready', 'Share this link with the classroom. The old link is now revoked.', result.link, 'Student link')
+      else toast(result.message)
+    } catch (error) { button.disabled = false; button.textContent = buttonText; toast(error.message, true) }
+  })
 }
 function openDeleteClassroomConfirmation() {
   const room = state.classroom
@@ -304,20 +338,43 @@ async function addSubject() {
     modal.remove(); toast('Subject added.'); await loadClassroom()
   })
 }
-function studentScreen(message) { app.innerHTML = `<main class="student-wrap"><header class="student-top"><a href="/" class="brand-lockup"><span class="brand-mark">C</span><span>CAN NOTES</span></a><span class="student-access">${icons.lock} Classroom link access</span></header><section id="student-content" class="student-content">${message}</section><footer class="student-footer">Shared by your college · <span>Anyone with this link can view this classroom’s materials.</span></footer></main>` }
+function studentScreen(message, allowInstall = false) {
+  app.innerHTML = `<main class="student-wrap"><header class="student-top"><a href="/" class="brand-lockup"><span class="brand-mark">C</span><span>CAN NOTES</span></a><div class="student-top-actions">${allowInstall ? '<button class="button button-secondary student-install" id="install-student-app" type="button">Install app</button>' : ''}<span class="student-access">${icons.lock} Classroom link access</span></div></header><section id="student-content" class="student-content">${message}</section><footer class="student-footer">Shared by your college · <span>Anyone with this link can view this classroom’s materials.</span></footer></main>`
+  const installButton = document.querySelector('#install-student-app')
+  if (installButton) {
+    if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) installButton.hidden = true
+    installButton.addEventListener('click', installStudentApp)
+  }
+}
+async function installStudentApp() {
+  if (!state.studentToken) return toast('Open the classroom link before installing Can Notes.', true)
+  try { localStorage.setItem(studentInstallTokenKey, state.studentToken) } catch { return toast('This browser could not save the classroom link for the installed app.', true) }
+  if (deferredInstallPrompt) {
+    const installPrompt = deferredInstallPrompt
+    deferredInstallPrompt = null
+    await installPrompt.prompt()
+    const choice = await installPrompt.userChoice
+    if (choice?.outcome === 'accepted') toast('Can Notes is being added to your device.')
+    return
+  }
+  const instructions = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+    ? '<ol><li>Tap the Share button in your browser.</li><li>Choose <b>Add to Home Screen</b>.</li><li>Tap <b>Add</b>.</li></ol>'
+    : '<p>Open your browser menu and choose <b>Install app</b> or <b>Add to Home screen</b>. The installed Can Notes app will open this classroom.</p>'
+  showDialog('Install Can Notes', 'Keep this classroom handy on your device.', `${instructions}<div class="subject-dialog-actions"><button class="button button-primary" type="button" data-close-dialog>Got it</button></div>`)
+}
 async function renderStudent() {
   studentScreen('<div class="loading-card"><span class="spinner"></span><p>Opening your classroom…</p></div>')
   const { data, error } = await supabase.functions.invoke('student-access', { body: { token: state.studentToken, action: 'list' } })
-  if (error || !data?.classroom) { studentScreen('<div class="not-found"><span>↗</span><h1>This classroom link is no longer available.</h1><p>Ask your college or teacher for a current link.</p></div>'); return }
+  if (error || !data?.classroom) { studentScreen('<div class="not-found"><span>↗</span><h1>This classroom link was revoked or replaced.</h1><p>Ask your college or teacher for the current classroom link.</p></div>'); return }
   renderStudentContent(data)
 }
 function renderStudentContent(data, subjectId = null, folderId = null, chain = []) {
-  const subject = data.subjects.find(s => s.id === subjectId) || data.subjects[0]; if (!subject) return studentScreen('<div class="not-found"><h1>No subjects yet.</h1><p>Materials will appear here when they’re added.</p></div>')
+  const subject = data.subjects.find(s => s.id === subjectId) || data.subjects[0]; if (!subject) return studentScreen('<div class="not-found"><h1>No subjects yet.</h1><p>Materials will appear here when they’re added.</p></div>', true)
   subjectId ||= subject.id
   const folders = data.folders.filter(folder => folder.subject_id === subjectId && (folder.parent_id || null) === (folderId || null))
   const files = data.materials.filter(file => file.subject_id === subjectId && (file.folder_id || null) === (folderId || null))
   const room = data.classroom
-  studentScreen(`<div class="student-heading"><div><span class="eyebrow">${esc(room.academic_year)} &nbsp;·&nbsp; ${esc(room.branch)}${room.section ? ` ${esc(room.section)}` : ''}</span><h1>${esc(room.name)}</h1><p>${esc(room.description || 'Class materials, all in one place.')}</p></div><div class="student-readonly">${icons.lock} View and download</div></div><div class="student-card"><aside class="student-subjects"><span class="eyebrow">SUBJECTS</span>${data.subjects.map(item => `<button class="student-subject ${item.id === subjectId ? 'active' : ''}" data-student-subject="${esc(item.id)}">${esc(item.name)}<span>›</span></button>`).join('')}</aside><div class="student-files"><div class="student-file-head"><div><span class="eyebrow">CLASS MATERIALS</span><h2>${esc(subject.name)}</h2></div><span>${folders.length + files.length} items</span></div><div class="crumb-trail"><button data-student-root>All ${esc(subject.name)}</button>${chain.map(folder => `<span>›</span><button data-student-crumb="${esc(folder.id)}">${esc(folder.name)}</button>`).join('')}</div><div class="file-list">${folders.map(folder => `<button class="file-row folder-row" data-student-folder="${esc(folder.id)}"><span class="file-icon folder-file">${icons.folder}</span><span class="file-name"><b>${esc(folder.name)}</b><small>Folder</small></span><span class="file-row-arrow">${icons.arrow}</span></button>`).join('')}${files.map(file => `<div class="file-row"><span class="file-icon ${fileIcon(file.mime_type)}">${fileIconSvg(file.mime_type)}</span><span class="file-name"><b>${esc(file.title)}</b><small>${esc(file.file_name)} · ${formatSize(file.file_size)}</small></span><button class="download-button" data-student-download="${esc(file.id)}">Download ${icons.arrow}</button></div>`).join('')}${!folders.length && !files.length ? '<div class="folder-empty"><span>—</span><b>No materials in this folder yet.</b></div>' : ''}</div></div></div>`)
+  studentScreen(`<div class="student-heading"><div><span class="eyebrow">${esc(room.academic_year)} &nbsp;·&nbsp; ${esc(room.branch)}${room.section ? ` ${esc(room.section)}` : ''}</span><h1>${esc(room.name)}</h1><p>${esc(room.description || 'Class materials, all in one place.')}</p></div><div class="student-readonly">${icons.lock} View and download</div></div><div class="student-card"><aside class="student-subjects"><span class="eyebrow">SUBJECTS</span>${data.subjects.map(item => `<button class="student-subject ${item.id === subjectId ? 'active' : ''}" data-student-subject="${esc(item.id)}">${esc(item.name)}<span>›</span></button>`).join('')}</aside><div class="student-files"><div class="student-file-head"><div><span class="eyebrow">CLASS MATERIALS</span><h2>${esc(subject.name)}</h2></div><span>${folders.length + files.length} items</span></div><div class="crumb-trail"><button data-student-root>All ${esc(subject.name)}</button>${chain.map(folder => `<span>›</span><button data-student-crumb="${esc(folder.id)}">${esc(folder.name)}</button>`).join('')}</div><div class="file-list">${folders.map(folder => `<button class="file-row folder-row" data-student-folder="${esc(folder.id)}"><span class="file-icon folder-file">${icons.folder}</span><span class="file-name"><b>${esc(folder.name)}</b><small>Folder</small></span><span class="file-row-arrow">${icons.arrow}</span></button>`).join('')}${files.map(file => `<div class="file-row"><span class="file-icon ${fileIcon(file.mime_type)}">${fileIconSvg(file.mime_type)}</span><span class="file-name"><b>${esc(file.title)}</b><small>${esc(file.file_name)} · ${formatSize(file.file_size)}</small></span><button class="download-button" data-student-download="${esc(file.id)}">Download ${icons.arrow}</button></div>`).join('')}${!folders.length && !files.length ? '<div class="folder-empty"><span>—</span><b>No materials in this folder yet.</b></div>' : ''}</div></div></div>`, true)
   document.querySelectorAll('[data-student-subject]').forEach(button => button.onclick = () => renderStudentContent(data, button.dataset.studentSubject))
   document.querySelectorAll('[data-student-folder]').forEach(button => button.onclick = () => { const folder = data.folders.find(item => item.id === button.dataset.studentFolder); renderStudentContent(data, subjectId, folder.id, [...chain, folder]) })
   document.querySelector('[data-student-root]')?.addEventListener('click', () => renderStudentContent(data, subjectId))

@@ -78,7 +78,7 @@ Supabase supplies its project URL and service-role secret to Edge Functions. If 
 2. Create a classroom for a year, branch and section (for example, `1st Year`, `CSE`, section `1`).
 3. Open it and add its subjects.
 4. Choose **Manage access** to invite a teacher by email or create a one-time teacher code.
-5. Choose **Manage access → Create or rotate the student link** and share it with that classroom's students.
+5. Choose **Manage access → Get classroom student link** and share the same link with that classroom's students. The link stays active until a teacher deliberately rotates or revokes it. Students can install Can Notes from the classroom page; the installed app opens their saved classroom link on that device.
 6. A teacher accepts an email invite or enters a teacher code after signing in. They can then upload to classrooms where their membership permits it.
 
 The student link is a bearer link: anyone it is forwarded to can view and download that classroom's materials. Rotation disables the previous link for future requests. A signed download URL already issued to a student remains valid for up to one minute.
@@ -94,4 +94,4 @@ The student link is a bearer link: anyone it is forwarded to can view and downlo
 
 ## Current limits
 
-The admin can create, edit and delete classrooms, invite teachers with upload/content permissions, create teacher join codes, and rotate student links. Teachers with content-management permission can rename/delete materials and remove nested folders from their classroom. Manage access also lets admins update each teacher's permissions or remove them from a classroom. Managing link expiry from the UI is a follow-up item.
+The admin can create, edit and delete classrooms, invite teachers with upload/content permissions, create teacher join codes, and manage student links. Teachers with content-management permission can rename/delete materials and remove nested folders from their classroom. Manage access also lets admins update each teacher's permissions or remove them from a classroom.

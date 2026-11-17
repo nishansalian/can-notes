@@ -4,6 +4,11 @@ const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 const cryptoHex = async (value: string) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, '0')).join('')
 const makeToken = (bytes = 24) => { const data = crypto.getRandomValues(new Uint8Array(bytes)); return btoa(String.fromCharCode(...data)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '') }
+const stableStudentToken = async (classroomId: string, generation: number, secret: string) => {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const bytes = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`can-notes:student-link:${classroomId}:${generation}`)))
+  return btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+}
 
 Deno.serve(async request => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: cors })
@@ -20,7 +25,7 @@ Deno.serve(async request => {
   const isAdmin = profile?.role === 'admin'
   try {
     const body = await request.json()
-    const classroomActions = new Set(['update_classroom', 'delete_classroom', 'list_teachers', 'update_teacher_permissions', 'remove_teacher', 'issue_teacher_code', 'invite_teacher', 'rotate_student_link'])
+    const classroomActions = new Set(['update_classroom', 'delete_classroom', 'list_teachers', 'update_teacher_permissions', 'remove_teacher', 'issue_teacher_code', 'invite_teacher', 'get_student_link', 'rotate_student_link', 'revoke_student_link'])
     if (classroomActions.has(body.action) && !isAdmin) {
       if (!body.classroom_id) return json({ error: 'Choose a classroom.' }, 400)
       const { data: membership } = await admin.from('classroom_members').select('can_manage_content').eq('classroom_id', body.classroom_id).eq('user_id', user.id).maybeSingle()
@@ -88,11 +93,34 @@ Deno.serve(async request => {
       if (membershipError) return json({ error: `Teacher was invited, but classroom membership failed: ${membershipError.message}` }, 400)
       return json({ message: `Invitation sent to ${email.trim()}.`, username: username.trim().toLowerCase() })
     }
-    if (body.action === 'rotate_student_link') {
-      const token = makeToken(32)
-      const { error } = await admin.from('student_links').upsert({ classroom_id: body.classroom_id, token_hash: await cryptoHex(token), created_by: user.id, created_at: new Date().toISOString(), revoked_at: null })
+    if (body.action === 'get_student_link' || body.action === 'rotate_student_link') {
+      const classroomId = body.classroom_id
+      const { data: current, error: readError } = await admin.from('student_links').select('token_hash, link_generation, revoked_at').eq('classroom_id', classroomId).maybeSingle()
+      if (readError) return json({ error: readError.message }, 400)
+
+      const secret = Deno.env.get('STUDENT_LINK_SECRET') || service
+      let generation = Math.max(1, Number(current?.link_generation) || 1)
+      let token = await stableStudentToken(classroomId, generation, secret)
+      let tokenHash = await cryptoHex(token)
+      const forceRotate = body.action === 'rotate_student_link'
+      const legacyOrRevoked = Boolean(current && (current.revoked_at || current.token_hash !== tokenHash))
+      const shouldIssue = !current || forceRotate || legacyOrRevoked
+
+      if (shouldIssue) {
+        if (current && (forceRotate || legacyOrRevoked)) generation += 1
+        token = await stableStudentToken(classroomId, generation, secret)
+        tokenHash = await cryptoHex(token)
+        const row = { classroom_id: classroomId, token_hash: tokenHash, link_generation: generation, created_by: user.id, created_at: new Date().toISOString(), revoked_at: null }
+        const { error } = await admin.from('student_links').upsert(row, { onConflict: 'classroom_id' })
+        if (error) return json({ error: error.message }, 400)
+      }
+      const baseUrl = Deno.env.get('APP_URL') || request.headers.get('origin')
+      return json({ link: `${baseUrl}/class#${token}`, replacedPrevious: legacyOrRevoked || forceRotate })
+    }
+    if (body.action === 'revoke_student_link') {
+      const { data, error } = await admin.from('student_links').update({ revoked_at: new Date().toISOString() }).eq('classroom_id', body.classroom_id).is('revoked_at', null).select('classroom_id').maybeSingle()
       if (error) return json({ error: error.message }, 400)
-      return json({ link: `${Deno.env.get('APP_URL') || request.headers.get('origin')}/class#${token}` })
+      return json({ message: data ? 'Student link revoked. Existing copies no longer work.' : 'There is no active student link to revoke.' })
     }
     return json({ error: 'Unknown admin action.' }, 400)
   } catch (error) { return json({ error: error instanceof Error ? error.message : 'Request failed.' }, 400) }

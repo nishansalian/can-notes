@@ -385,16 +385,18 @@ function renderStudentContent(data, subjectId = null, folderId = null, chain = [
 }
 async function previewStudentMaterial(material) {
   if (!material || !studentCanPreview(material)) return toast('This file type needs to be downloaded to open.', true)
-  const { data, error } = await supabase.functions.invoke('student-access', { body: { token: state.studentToken, action: 'preview', material_id: material.id } })
+  const { data, error } = await supabase.functions.invoke('student-access', { body: { token: state.studentToken, action: 'download', material_id: material.id } })
   if (error || !data?.url) return toast('This material could not be previewed.', true)
+  const previewUrl = new URL(data.url)
+  previewUrl.searchParams.delete('download')
   const type = (material.mime_type || '').toLowerCase()
   const content = type.startsWith('image/')
-    ? `<div class="preview-content"><img src="${esc(data.url)}" alt="${esc(material.title)}"></div>`
+    ? `<div class="preview-content"><img src="${esc(previewUrl.toString())}" alt="${esc(material.title)}"></div>`
     : type.startsWith('audio/')
-      ? `<div class="preview-content"><audio src="${esc(data.url)}" controls></audio></div>`
+      ? `<div class="preview-content"><audio src="${esc(previewUrl.toString())}" controls></audio></div>`
       : type.startsWith('video/')
-        ? `<div class="preview-content"><video src="${esc(data.url)}" controls playsinline></video></div>`
-        : `<div class="preview-content"><iframe src="${esc(data.url)}" title="${esc(material.title)}" loading="lazy"></iframe></div>`
+        ? `<div class="preview-content"><video src="${esc(previewUrl.toString())}" controls playsinline></video></div>`
+        : `<div class="preview-content"><iframe src="${esc(previewUrl.toString())}" title="${esc(material.title)}" loading="lazy"></iframe></div>`
   const dialog = showDialog(material.title, material.file_name, `${content}<div class="subject-dialog-actions"><button class="button button-secondary" type="button" data-close-dialog>Close preview</button></div>`)
   dialog.querySelector('.subject-dialog')?.classList.add('preview-dialog')
 }

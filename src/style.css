@@ -8,3 +8,32 @@
 .student-top-actions{display:flex;align-items:center;gap:16px}.student-install{padding:8px 12px;font-size:10px}.student-install[hidden]{display:none}
 @media(max-width:760px){.student-top-actions{gap:8px}.student-install{padding:7px 9px;font-size:9px}.student-access{font-size:0}.student-access svg{width:16px}}
 .student-file-actions{display:flex;align-items:center;gap:5px;flex:0 0 auto}.student-preview-button{border:1px solid #e6e1ea;border-radius:6px;background:#fff;color:#695b77;font-size:8px;padding:6px 8px;cursor:pointer}.student-preview-button:hover{background:#f5f2f7}.preview-dialog{width:min(100%,980px);max-height:90vh;overflow:auto}.preview-content{display:grid;place-items:center;min-height:180px;max-height:68vh;overflow:auto;background:#f5f4f2;border:1px solid #ece9e5;border-radius:9px}.preview-content iframe{width:100%;height:min(68vh,720px);border:0;background:white}.preview-content img{display:block;max-width:100%;max-height:68vh;object-fit:contain}.preview-content audio{width:min(calc(100% - 30px),560px)}.preview-content video{max-width:100%;max-height:68vh}@media(max-width:420px){.student-preview-button{font-size:7px;padding:7px 6px}}
+.theme-toggle{border:1px solid #e5e1e8;border-radius:8px;background:#fff;color:#62586b;padding:7px 10px;font-size:10px;font-weight:600;cursor:pointer;white-space:nowrap}.theme-toggle:hover{border-color:#b9afc5}.auth-theme-toggle{position:absolute;top:18px;right:20px}.auth-wrap{position:relative}
+:root[data-theme="dark"]{color-scheme:dark;background:#15141a;color:#ece9f0;--ink:#ece9f0;--muted:#aaa4b2;--line:#393640;--paper:#211f27}
+:root[data-theme="dark"] body,:root[data-theme="dark"] .app-shell,:root[data-theme="dark"] .main-content,:root[data-theme="dark"] .page-content,:root[data-theme="dark"] .student-wrap{background:#15141a;color:#ece9f0}
+:root[data-theme="dark"] .sidebar,:root[data-theme="dark"] .topbar,:root[data-theme="dark"] .auth-wrap{background:#1d1b22;border-color:#34313b}
+:root[data-theme="dark"] .student-top,:root[data-theme="dark"] .student-footer{border-color:#393640}
+:root[data-theme="dark"] .eyebrow,:root[data-theme="dark"] .breadcrumbs,:root[data-theme="dark"] .muted,:root[data-theme="dark"] .side-label,:root[data-theme="dark"] .section-count,:root[data-theme="dark"] .material-count,:root[data-theme="dark"] .student-access,:root[data-theme="dark"] .student-footer,:root[data-theme="dark"] .file-date{color:#aaa4b2}
+:root[data-theme="dark"] .sidebar .brand-mark,:root[data-theme="dark"] .brand-mark{background:#554b62}
+:root[data-theme="dark"] .nav-item,:root[data-theme="dark"] .subject-item,:root[data-theme="dark"] .back-link,:root[data-theme="dark"] .profile-row,:root[data-theme="dark"] .text-button{color:#c8c2cf}
+:root[data-theme="dark"] .nav-item.active,:root[data-theme="dark"] .subject-item.active,:root[data-theme="dark"] .room-sidebar-title,:root[data-theme="dark"] .permission-pill{background:#302c38;color:#e7e1ec}
+:root[data-theme="dark"] .room-sidebar-title small,:root[data-theme="dark"] .secure-note,:root[data-theme="dark"] .side-empty{color:#aaa4b2}
+:root[data-theme="dark"] .classroom-card,:root[data-theme="dark"] .stat-card,:root[data-theme="dark"] .materials-panel,:root[data-theme="dark"] .student-card,:root[data-theme="dark"] .empty-state,:root[data-theme="dark"] .auth-card,:root[data-theme="dark"] .mini-window{background:#211f27;border-color:#393640;color:#ece9f0}
+:root[data-theme="dark"] .classroom-card>p,:root[data-theme="dark"] .room-year,:root[data-theme="dark"] .room-card-bottom,:root[data-theme="dark"] .stat-card small{color:#aaa4b2}
+:root[data-theme="dark"] .join-banner,:root[data-theme="dark"] .student-share-note,:root[data-theme="dark"] .crumb-trail{background:#26232d;border-color:#393640;color:#d7d1df}
+:root[data-theme="dark"] .file-row,:root[data-theme="dark"] .folder-open,:root[data-theme="dark"] .student-subjects,:root[data-theme="dark"] .year-section{border-color:#393640}
+:root[data-theme="dark"] .folder-open,:root[data-theme="dark"] .folder-row,:root[data-theme="dark"] .student-subject{background:transparent;color:#d7d1df}
+:root[data-theme="dark"] .folder-open:hover,:root[data-theme="dark"] .folder-row:hover,:root[data-theme="dark"] .student-subject.active{background:#302c38;color:#f2eef6}
+:root[data-theme="dark"] .file-name b,:root[data-theme="dark"] .student-file-head h2,:root[data-theme="dark"] .student-heading h1,:root[data-theme="dark"] .classroom-heading h1,:root[data-theme="dark"] .panel-top h2,:root[data-theme="dark"] .section-heading h2{color:#f0edf3}
+:root[data-theme="dark"] .file-name small,:root[data-theme="dark"] .student-heading p,:root[data-theme="dark"] .student-share-note p{color:#aaa4b2}
+:root[data-theme="dark"] .student-readonly,:root[data-theme="dark"] .download-button,:root[data-theme="dark"] .student-preview-button,:root[data-theme="dark"] .theme-toggle,:root[data-theme="dark"] .button-secondary{background:#302c38;border-color:#494352;color:#e8e2ed}
+:root[data-theme="dark"] .theme-toggle:hover,:root[data-theme="dark"] .student-preview-button:hover,:root[data-theme="dark"] .button-secondary:hover{background:#3a3543;border-color:#62596d}
+:root[data-theme="dark"] .student-install{background:#302c38;color:#e8e2ed}
+:root[data-theme="dark"] .modal-backdrop{background:#08070bbd}
+:root[data-theme="dark"] .subject-dialog,:root[data-theme="dark"] .admin-action-row,:root[data-theme="dark"] .teacher-list-row{background:#211f27;border-color:#393640;color:#ece9f0}
+:root[data-theme="dark"] .subject-dialog p,:root[data-theme="dark"] .admin-action-row small,:root[data-theme="dark"] .teacher-list-row small,:root[data-theme="dark"] .dialog-loading{color:#aaa4b2}
+:root[data-theme="dark"] .subject-dialog input,:root[data-theme="dark"] .dialog-form input,:root[data-theme="dark"] .dialog-form select,:root[data-theme="dark"] .dialog-form textarea,:root[data-theme="dark"] .result-value,:root[data-theme="dark"] .search-box{background:#17151c;border-color:#494352;color:#f0edf3}
+:root[data-theme="dark"] .search-box input{color:#f0edf3}
+:root[data-theme="dark"] .student-file-head,:root[data-theme="dark"] .panel-top,:root[data-theme="dark"] .classroom-card,:root[data-theme="dark"] .stat-card{color:#ece9f0}
+:root[data-theme="dark"] .preview-content{background:#17151c;border-color:#393640}
+:root[data-theme="dark"] .not-found h1,:root[data-theme="dark"] .empty-state h2{color:#f0edf3}

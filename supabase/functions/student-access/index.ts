@@ -13,11 +13,12 @@ Deno.serve(async request => {
     const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } })
     const { data: link } = await db.from('student_links').select('classroom_id, revoked_at').eq('token_hash', await cryptoHex(body.token)).maybeSingle()
     if (!link || link.revoked_at) return json({ error: 'Classroom link is no longer available.' }, 404)
-    if (body.action === 'download') {
+    if (body.action === 'download' || body.action === 'preview') {
       if (typeof body.material_id !== 'string') return json({ error: 'Material not found.' }, 404)
       const { data: material } = await db.from('materials').select('storage_path, file_name').eq('id', body.material_id).eq('classroom_id', link.classroom_id).maybeSingle()
       if (!material) return json({ error: 'Material not found.' }, 404)
-      const { data, error } = await db.storage.from('class-materials').createSignedUrl(material.storage_path, 60, { download: material.file_name })
+      const download = body.action === 'download'
+      const { data, error } = await db.storage.from('class-materials').createSignedUrl(material.storage_path, download ? 60 : 600, download ? { download: material.file_name } : undefined)
       if (error) return json({ error: 'Material could not be opened.' }, 500)
       return json({ url: data.signedUrl })
     }

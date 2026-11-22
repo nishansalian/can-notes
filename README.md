@@ -9,7 +9,7 @@ A college materials space with independent classrooms, teacher accounts, private
 - One teacher dashboard lists every classroom membership across four academic years and all branches/sections.
 - Each classroom owns its subjects. Subjects can contain nested folders and uploaded files.
 - Classroom memberships determine teacher access and content permissions.
-- College admins can create, edit and delete classrooms, invite teachers by email with upload/content permissions, create one-time teacher join codes, and rotate classroom student links.
+- College admins can create, edit and delete classrooms, invite teachers by email with upload/content permissions, create reusable classroom teacher join codes, and rotate classroom student links.
 - Students have no account. The current classroom link grants view/download access to that room. Forwarded links work for whoever receives them. Rotating the link blocks new use of the old link.
 - Files live in a private Supabase Storage bucket. Teacher uploads/downloads are checked by Storage RLS; student downloads use a one-minute signed URL issued by an Edge Function.
 - No service-role key is included in the frontend.
@@ -87,11 +87,11 @@ The student link is a bearer link: anyone it is forwarded to can view and downlo
 
 - `profiles`, `classrooms`, `classroom_members`, `subjects`, `folders`, `materials`, invites and student links all have RLS enabled.
 - Student links are stored as SHA-256 hashes; only an admin Edge Function can create or rotate one.
-- Teacher invite codes are single-use, expire in 14 days and are stored as hashes.
+- New teacher join codes are stable per classroom, reusable, and remain active until rotated. A signed-in person who receives one can join as a full teacher and manage the classroom, so only share it with trusted teachers. Codes are stored as hashes plus a protected code value so authorized classroom teachers can re-share the same code. Older one-time teacher invitations keep their original 14-day expiry.
 - Student browsing is scoped to exactly one classroom by the link token. Public file access is never enabled on the Storage bucket.
 - File uploads are capped at 50 MiB by the bucket configuration.
 - Supabase's Auth invite and recovery emails require email delivery configuration for reliable real-world use.
 
 ## Current limits
 
-The admin can create, edit and delete classrooms, invite teachers with upload/content permissions, create teacher join codes, and manage student links. Teachers with content-management permission can rename/delete materials and remove nested folders from their classroom. Manage access also lets admins update each teacher's permissions or remove them from a classroom.
+The admin can create, edit and delete classrooms, invite teachers with upload/content permissions, create stable teacher join codes, share them through WhatsApp or Gmail, rotate them if needed, and manage student links. Teachers with content-management permission can rename/delete materials and remove nested folders from their classroom. Manage access also lets admins update each teacher's permissions or remove them from a classroom.
